@@ -1,11 +1,14 @@
-# **Cemu - Wii U emulator**
+# **Cemu-CloudSync**
 
-[![Build Process](https://github.com/cemu-project/Cemu/actions/workflows/build.yml/badge.svg)](https://github.com/cemu-project/Cemu/actions/workflows/build.yml)
-[![Discord](https://img.shields.io/discord/286429969104764928?label=Cemu&logo=discord&logoColor=FFFFFF)](https://discord.gg/5psYsup)
-[![Matrix Server](https://img.shields.io/matrix/cemu:cemu.info?server_fqdn=matrix.cemu.info&label=cemu:cemu.info&logo=matrix&logoColor=FFFFFF)](https://matrix.to/#/#cemu:cemu.info)
+[![Build check](https://github.com/gdiazbanuelos/Cemu-CloudSync/actions/workflows/build_check.yml/badge.svg)](https://github.com/gdiazbanuelos/Cemu-CloudSync/actions/workflows/build_check.yml)
+[![Release current build](https://github.com/gdiazbanuelos/Cemu-CloudSync/actions/workflows/release_now.yml/badge.svg)](https://github.com/gdiazbanuelos/Cemu-CloudSync/actions/workflows/release_now.yml)
+[![Latest release](https://img.shields.io/github/v/release/gdiazbanuelos/Cemu-CloudSync)](https://github.com/gdiazbanuelos/Cemu-CloudSync/releases)
 
-This is the code repository of Cemu, a Wii U emulator that is able to run most Wii U games and homebrew in a playable state.
-It's written in C/C++ and is being actively developed with new features and fixes.
+This is a personal fork of [Cemu](https://github.com/cemu-project/Cemu), a Wii U emulator that is able to run most Wii U games and homebrew in a playable state.
+
+This fork adds **CloudSync**: automatic save file syncing to Dropbox via [rclone](https://rclone.org/). When a game starts, saves are pulled from Dropbox if a newer copy exists remotely; after the save system initializes, local saves are pushed back up. Works on Windows and Linux (including AppImage builds).
+
+Everything else below is unmodified from upstream Cemu.
 
 Cemu is currently only available for 64-bit Windows, Linux & macOS devices.
 
@@ -24,13 +27,79 @@ Cemu is currently only available for 64-bit Windows, Linux & macOS devices.
 
 ## Download
 
-You can download the latest Cemu releases for Windows, Linux and Mac from the [GitHub Releases](https://github.com/cemu-project/Cemu/releases/). For Linux you can also find Cemu on [flathub](https://flathub.org/apps/info.cemu.Cemu).
+You can download the latest build of this fork (with CloudSync) from this repo's [GitHub Releases](https://github.com/gdiazbanuelos/Cemu-CloudSync/releases).
+
+For the official, unmodified Cemu, see the upstream [GitHub Releases](https://github.com/cemu-project/Cemu/releases/) or [flathub](https://flathub.org/apps/info.cemu.Cemu) for Linux.
 
 On Windows, Cemu is available both as an installer and in a portable format, where no installation is required besides extracting it in a safe place.
 
 The native macOS build is currently purely experimental and should not be considered stable or ready for issue-free gameplay. There are also known issues with degraded performance due to the use of MoltenVK and Rosetta for ARM Macs. We appreciate your patience while we improve Cemu for macOS.
 
 Pre-2.0 releases can be found on Cemu's [changelog page](https://cemu.info/changelog.html).
+
+## CloudSync Setup
+
+CloudSync needs an [rclone](https://rclone.org/) remote named exactly **`Dropbox`** (case-sensitive) configured on your system before saves will sync.
+
+### Windows
+
+1. Download the Windows zip from [rclone.org/downloads](https://rclone.org/downloads/)
+2. Extract it somewhere permanent, e.g. `C:\rclone\`
+3. Add that folder to your `PATH`: Windows Search → "Environment Variables" → **Edit the system environment variables** → **Environment Variables** → under "System variables" select `Path` → **Edit** → **New** → add `C:\rclone` → OK everywhere
+4. Open a **new** PowerShell/Command Prompt window (to pick up the updated `PATH`) and run:
+   ```
+   rclone config
+   ```
+5. Follow the wizard:
+   - `n` → New remote
+   - Name: `Dropbox`
+   - Storage type: pick the number for `dropbox`
+   - Leave `client_id`/`client_secret` blank (press Enter) unless you've set up your own Dropbox app
+   - Edit advanced config: `n`
+   - Use auto config: `y` — this opens your browser to log into Dropbox and authorize rclone
+   - Confirm and `q` to quit config
+6. Test it:
+   ```
+   rclone lsd Dropbox:
+   ```
+   Should list your Dropbox's top-level folders with no error.
+
+### Linux / Steam Deck
+
+Steam Deck's rootfs is read-only by default, so don't use `sudo pacman -S` — install rclone to your user's home directory instead.
+
+**Steam Deck (Desktop Mode → open Konsole terminal):**
+```bash
+mkdir -p ~/.local/bin
+curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+unzip rclone-current-linux-amd64.zip
+cp rclone-*-linux-amd64/rclone ~/.local/bin/
+chmod +x ~/.local/bin/rclone
+rm -r rclone-*-linux-amd64 rclone-current-linux-amd64.zip
+```
+
+**Regular Linux distro (with sudo):**
+```bash
+sudo apt install rclone      # Debian/Ubuntu
+# or
+curl https://rclone.org/install.sh | sudo bash
+```
+
+Then on either, configure the Dropbox remote (same steps as Windows):
+```bash
+~/.local/bin/rclone config   # or just `rclone config` if it's on your PATH
+```
+- `n` → New remote
+- Name: `Dropbox`
+- Storage type: `dropbox`
+- Leave client_id/secret blank
+- Advanced config: `n`
+- Auto config: `y` (Desktop Mode has a browser, so this should work directly)
+
+Test:
+```bash
+~/.local/bin/rclone lsd Dropbox:
+```
 
 ## Build Instructions
 
