@@ -1,9 +1,7 @@
-name: Sync upstream
+name: Sync upstream and release
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
 
 permissions:
   contents: write
@@ -33,3 +31,8 @@ jobs:
 
       - name: Push to fork
         run: git push origin main
+
+  release:
+    name: Build and release merged code
+    needs: sync
+    uses: ./.github/workflows/release_now.yml
