@@ -250,12 +250,6 @@ namespace save
 		return ActiveSettings::GetMlcPath(subDir);
 	}
 
-	bool CloudSync_LocalSaveDirExists(uint32 high, uint32 low)
-	{
-		std::error_code ec;
-		return fs::is_directory(CloudSync_GetLocalSaveDir(high, low), ec);
-	}
-
 	// Dropbox:Cemu Cloud Saves/<Game Name> (<Game ID>)
 	std::string CloudSync_GetRemotePath(uint64 titleId)
 	{
@@ -405,7 +399,7 @@ namespace save
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
 
-		std::wstring cmdLine = L"rclone copy \"" + boost::nowide::widen(localPath) + L"\" \"" + boost::nowide::widen(remotePath) + L"\" -v";
+		std::wstring cmdLine = L"rclone copy \"" + boost::nowide::widen(localPath) + L"\" \"" + boost::nowide::widen(remotePath) + L"\" --no-traverse -v";
 		cmdLine.push_back(L'\0'); // CreateProcessW requires a writable, mutable buffer
 
 		std::thread([cmdLine = std::move(cmdLine)]() mutable {
@@ -421,7 +415,7 @@ namespace save
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
 
 		std::thread([localPath, remotePath]() {
-			sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", localPath, remotePath, "-v"});
+			sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", localPath, remotePath, "--no-traverse", "-v"});
 			cemuLog_log(LogType::Save, "CloudSync: rclone push finished with exit code {}", exitCode);
 			if (exitCode == 0)
 				LatteOverlay_pushNotification("Save pushed to Dropbox", 3000);
@@ -439,9 +433,11 @@ namespace save
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
 
-		cemuLog_log(LogType::Save, "CloudSync: no local save dir found, pulling from {}", remotePath);
+		cemuLog_log(LogType::Save, "CloudSync: pulling from {}", remotePath);
 
-		std::wstring cmdLine = L"rclone copy \"" + boost::nowide::widen(remotePath) + L"\" \"" + boost::nowide::widen(localPath) + L"\" -v";
+		// --update: only overwrite a local file if the remote copy is newer, so a stale pull
+		// never clobbers a save that's already ahead (e.g. was never pushed yet on this machine).
+		std::wstring cmdLine = L"rclone copy \"" + boost::nowide::widen(remotePath) + L"\" \"" + boost::nowide::widen(localPath) + L"\" --update --no-traverse -v";
 		cmdLine.push_back(L'\0'); // CreateProcessW requires a writable, mutable buffer
 
 		sint32 exitCode = CloudSync_RunRcloneBlocking(std::move(cmdLine));
@@ -454,9 +450,9 @@ namespace save
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
 
-		cemuLog_log(LogType::Save, "CloudSync: no local save dir found, pulling from {}", remotePath);
+		cemuLog_log(LogType::Save, "CloudSync: pulling from {}", remotePath);
 
-		sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", remotePath, localPath, "-v"});
+		sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", remotePath, localPath, "--update", "--no-traverse", "-v"});
 		cemuLog_log(LogType::Save, "CloudSync: rclone pull finished with exit code {}", exitCode);
 		if (exitCode == 0)
 			LatteOverlay_pushNotification("Save pulled from Dropbox", 3000);
@@ -487,8 +483,7 @@ namespace save
 			uint32 high = GetTitleIdHigh(titleId) & (~0xC);
 			uint32 low = GetTitleIdLow(titleId);
 
-			if (!CloudSync_LocalSaveDirExists(high, low))
-				CloudSync_PullSaveFromDropbox(high, low, titleId);
+			CloudSync_PullSaveFromDropbox(high, low, titleId);
 
 			sint32 fscStatus = FSC_STATUS_FILE_NOT_FOUND;
 			char path[256];
