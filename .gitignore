@@ -15,6 +15,7 @@
 .vs
 .vscode
 .idea/
+.claude/
 
 build/
 cmake-build-*/
