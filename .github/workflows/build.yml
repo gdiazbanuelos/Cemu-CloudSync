@@ -205,6 +205,7 @@ jobs:
         path: ./src/resource/cemu-${{ inputs.next_version_major }}.${{ inputs.next_version_minor }}-windows-x64-installer.exe
 
   build-macos:
+    continue-on-error: true
     runs-on: macos-14
     strategy:
       fail-fast: false
