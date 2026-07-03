@@ -4,9 +4,15 @@
 [![Release current build](https://github.com/gdiazbanuelos/Cemu-CloudSync/actions/workflows/release_now.yml/badge.svg)](https://github.com/gdiazbanuelos/Cemu-CloudSync/actions/workflows/release_now.yml)
 [![Latest release](https://img.shields.io/github/v/release/gdiazbanuelos/Cemu-CloudSync)](https://github.com/gdiazbanuelos/Cemu-CloudSync/releases)
 
+
+| Cloud Saves Menu Icon | Cloud Saves Settings Tab |
+|:---:|:---:|
+| ![Cloud Saves menu icon](docs/cloudsaves.png) | ![Cloud Saves settings tab](docs/cloudsavessettings.png) |
+
+
 This is a personal fork of [Cemu](https://github.com/cemu-project/Cemu), a Wii U emulator that is able to run most Wii U games and homebrew in a playable state.
 
-This fork adds **CloudSync**: automatic save file syncing to Dropbox via [rclone](https://rclone.org/). When a game starts, saves are pulled from Dropbox if a newer copy exists remotely; after the save system initializes, local saves are pushed back up. Works on Windows and Linux (including AppImage builds).
+This fork adds cloud save syncing using [rclone](https://rclone.org/) (Dropbox by default, but configurable to Google Drive, OneDrive, or any other rclone-supported remote). When a game starts, saves are pulled from the cloud if a newer copy exists remotely; after the save system initializes, local saves are pushed back up. Works on Windows and Linux (including AppImage builds).
 
 Everything else below is unmodified from upstream Cemu.
 
@@ -39,7 +45,7 @@ Pre-2.0 releases can be found on Cemu's [changelog page](https://cemu.info/chang
 
 ## CloudSync Setup
 
-CloudSync needs an [rclone](https://rclone.org/) remote named exactly **`Dropbox`** (case-sensitive) configured on your system before saves will sync.
+CloudSync needs an [rclone](https://rclone.org/) remote configured on your system before saves will sync. By default it looks for a remote named `Dropbox`, but this is configurable in-app under **Cloud Saves → Settings → Rclone remote name** — it can point to any rclone-supported cloud provider (Dropbox, Google Drive, OneDrive, etc.), not just Dropbox. The instructions below use `Dropbox` as the example name; substitute your own remote name if you configured something else.
 
 ### Windows
 
@@ -52,17 +58,17 @@ CloudSync needs an [rclone](https://rclone.org/) remote named exactly **`Dropbox
    ```
 5. Follow the wizard:
    - `n` → New remote
-   - Name: `Dropbox`
-   - Storage type: pick the number for `dropbox`
-   - Leave `client_id`/`client_secret` blank (press Enter) unless you've set up your own Dropbox app
+   - Name: pick any name you want (e.g. `Dropbox`) — it doesn't have to be Dropbox specifically, any rclone-supported provider works. **Whatever you type here, enter that exact same name (case-sensitive) in Cemu's Options → Cloud Saves → Settings → "Rclone remote name" field**, or CloudSync won't be able to find it.
+   - Storage type: pick the number for your provider (e.g. `dropbox`, `drive` for Google Drive, `onedrive`, etc.)
+   - Leave `client_id`/`client_secret` blank (press Enter) unless you've set up your own app with that provider
    - Edit advanced config: `n`
-   - Use auto config: `y` — this opens your browser to log into Dropbox and authorize rclone
+   - Use auto config: `y` — this opens your browser to log in and authorize rclone
    - Confirm and `q` to quit config
-6. Test it:
+6. Test it (replace `Dropbox` with whatever name you actually chose):
    ```
    rclone lsd Dropbox:
    ```
-   Should list your Dropbox's top-level folders with no error.
+   Should list your remote's top-level folders with no error.
 
 ### Linux / Steam Deck
 
@@ -85,18 +91,18 @@ sudo apt install rclone      # Debian/Ubuntu
 curl https://rclone.org/install.sh | sudo bash
 ```
 
-Then on either, configure the Dropbox remote (same steps as Windows):
+Then on either, configure the remote (same steps as Windows):
 ```bash
 ~/.local/bin/rclone config   # or just `rclone config` if it's on your PATH
 ```
 - `n` → New remote
-- Name: `Dropbox`
-- Storage type: `dropbox`
+- Name: pick any name you want (e.g. `Dropbox`) — it doesn't have to be Dropbox specifically, any rclone-supported provider works. **Whatever you type here, enter that exact same name (case-sensitive) in Cemu's Options → Cloud Saves → Settings → "Rclone remote name" field**, or CloudSync won't be able to find it.
+- Storage type: pick your provider (e.g. `dropbox`, `drive` for Google Drive, `onedrive`, etc.)
 - Leave client_id/secret blank
 - Advanced config: `n`
 - Auto config: `y` (Desktop Mode has a browser, so this should work directly)
 
-Test:
+Test (replace `Dropbox` with whatever name you actually chose):
 ```bash
 ~/.local/bin/rclone lsd Dropbox:
 ```
