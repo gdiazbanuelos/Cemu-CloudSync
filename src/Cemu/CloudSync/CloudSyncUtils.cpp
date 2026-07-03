@@ -188,49 +188,55 @@ namespace CloudSync
 	}
 #endif
 
-	static std::string GetInstallInstructions()
+	static std::string GetInstallInstructions(const std::string& remoteName)
 	{
-#if BOOST_OS_WINDOWS
-		return
+		return fmt::format(
 			"rclone was not found.\n\n"
-			"To set it up:\n"
+			"=== Windows ===\n"
 			"1. Download rclone from https://rclone.org/downloads/\n"
-			"2. Extract it to a folder (e.g. C:\\rclone) and add that folder to your PATH\n"
-			"3. Open a new terminal and run: rclone config\n"
-			"4. Create a new remote named exactly \"Dropbox\" (type: dropbox), use auto config to authorize via browser\n"
-			"5. Restart Cemu and re-open this tab to verify";
-#else
-		return
-			"rclone was not found.\n\n"
-			"To set it up:\n"
-			"1. Install rclone to your user directory, e.g.:\n"
+			"2. Extract it to a folder (e.g. C:\\rclone)\n"
+			"3. Add that folder to your PATH: Windows Search -> \"Environment Variables\" -> Edit the system environment variables -> Environment Variables -> under \"System variables\" select Path -> Edit -> New -> add C:\\rclone -> OK everywhere\n"
+			"4. Open a NEW terminal (to pick up the updated PATH) and run: rclone config\n"
+			"5. When asked for a remote name, type: {0}\n"
+			"   (this name must exactly match the \"Rclone remote name\" field above, including capitalization. When rclone asks for the storage type, choose dropbox - or whichever cloud provider you actually use - then use auto config to authorize via browser)\n"
+			"6. Restart Cemu and re-open this tab to verify\n\n"
+			"=== Linux / Steam Deck ===\n"
+			"1. Install rclone to your user directory (no root/sudo needed, works on Steam Deck's read-only rootfs too):\n"
 			"   mkdir -p ~/.local/bin\n"
 			"   curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip\n"
 			"   unzip rclone-current-linux-amd64.zip && cp rclone-*-linux-amd64/rclone ~/.local/bin/\n"
 			"   chmod +x ~/.local/bin/rclone\n"
 			"2. Run: ~/.local/bin/rclone config\n"
-			"3. Create a new remote named exactly \"Dropbox\" (type: dropbox), use auto config to authorize via browser\n"
-			"4. Restart Cemu and re-open this tab to verify";
-#endif
+			"3. When asked for a remote name, type: {0}\n"
+			"   (this name must exactly match the \"Rclone remote name\" field above, including capitalization. When rclone asks for the storage type, choose dropbox - or whichever cloud provider you actually use - then use auto config to authorize via browser)\n"
+			"4. Restart Cemu and re-open this tab to verify", remoteName);
 	}
 
-	bool CheckDropboxRemote(std::string& outMessage)
+	bool CheckCloudRemote(const std::string& remoteName, std::string& outMessage)
 	{
+		if (remoteName.empty())
+		{
+			outMessage = "No rclone remote name configured. Set one above and save.";
+			return false;
+		}
+
 		std::string rclonePath = FindRclonePath();
 		if (rclonePath.empty())
 		{
-			outMessage = GetInstallInstructions();
+			outMessage = GetInstallInstructions(remoteName);
 			return false;
 		}
+
+		const std::string remoteFolder = fmt::format("{}:Cemu Cloud Saves", remoteName);
 
 		std::string output;
 		sint32 exitCode = -1;
 		bool spawnOk;
 #if BOOST_OS_WINDOWS
-		std::wstring cmdLine = L"\"" + boost::nowide::widen(rclonePath) + L"\" lsd \"Dropbox:Cemu Cloud Saves\"";
+		std::wstring cmdLine = L"\"" + boost::nowide::widen(rclonePath) + L"\" lsd \"" + boost::nowide::widen(remoteFolder) + L"\"";
 		spawnOk = RunCaptured(cmdLine, output, exitCode);
 #else
-		spawnOk = RunCaptured(rclonePath, {"lsd", "Dropbox:Cemu Cloud Saves"}, output, exitCode);
+		spawnOk = RunCaptured(rclonePath, {"lsd", remoteFolder}, output, exitCode);
 #endif
 
 		if (!spawnOk)
@@ -241,23 +247,35 @@ namespace CloudSync
 
 		if (exitCode == 0)
 		{
-			outMessage = fmt::format("rclone found at:\n{}\n\nDropbox remote is configured correctly.\n\nGames with synced saves:\n{}", rclonePath, output.empty() ? "(none yet)" : output);
+			outMessage = fmt::format("rclone found at:\n{}\n\nRemote \"{}\" is configured correctly.\n\nGames with synced saves:\n{}", rclonePath, remoteName, output.empty() ? "(none yet)" : output);
 			return true;
 		}
 
-		// The "Cemu Cloud Saves" folder doesn't exist yet if no save has ever been pushed to
-		// Dropbox on this remote. That's expected on a fresh setup, not a real failure -
-		// CloudSync creates the folder automatically the first time a game saves.
+		// The "Cemu Cloud Saves" folder doesn't exist yet if no save has ever been pushed via
+		// this remote. That's expected on a fresh setup, not a real failure - CloudSync creates
+		// the folder automatically the first time a game saves.
 		if (output.find("directory not found") != std::string::npos)
 		{
-			outMessage = fmt::format("rclone found at:\n{}\n\nDropbox remote is configured correctly.\n\nNo \"Cemu Cloud Saves\" folder yet - it will be created automatically the first time a game pushes a save.", rclonePath);
+			outMessage = fmt::format("rclone found at:\n{}\n\nRemote \"{}\" is configured correctly.\n\nNo \"Cemu Cloud Saves\" folder yet - it will be created automatically the first time a game pushes a save.", rclonePath, remoteName);
 			return true;
+		}
+
+		// rclone's error text for an unconfigured remote is long and technical - simplify it
+		// down to the actual problem and point the user at the command that lists what's set up.
+		if (output.find("didn't find section in config file") != std::string::npos)
+		{
+			outMessage = fmt::format(
+				"No rclone remote named \"{}\" was found.\n\n"
+				"Run \"rclone listremotes\" in a terminal to see your configured remotes, then "
+				"set the correct name above, or run \"rclone config\" to create one named \"{}\".",
+				remoteName, remoteName);
+			return false;
 		}
 
 		outMessage = fmt::format(
-			"rclone found at:\n{}\n\nBut \"rclone lsd Dropbox:Cemu Cloud Saves\" failed (exit code {}):\n{}\n\n"
-			"Make sure you've configured a remote named exactly \"Dropbox\" by running: rclone config",
-			rclonePath, exitCode, output.empty() ? "(no output)" : output);
+			"rclone found at:\n{}\n\nBut checking remote \"{}\" failed (exit code {}):\n{}\n\n"
+			"Run \"rclone listremotes\" to see your configured remotes.",
+			rclonePath, remoteName, exitCode, output.empty() ? "(no output)" : output);
 		return false;
 	}
 }

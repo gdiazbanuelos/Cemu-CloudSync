@@ -8,6 +8,7 @@
 #include <sstream>
 #include <thread>
 #include "config/ActiveSettings.h"
+#include "config/CemuConfig.h"
 #include "Cafe/OS/libs/coreinit/coreinit_Thread.h"
 #include "Cafe/OS/libs/coreinit/coreinit_FS.h"
 #include "Cafe/CafeSystem.h"
@@ -250,7 +251,8 @@ namespace save
 		return ActiveSettings::GetMlcPath(subDir);
 	}
 
-	// Dropbox:Cemu Cloud Saves/<Game Name> (<Game ID>)
+	// <remote>:Cemu Cloud Saves/<Game Name> (<Game ID>)
+	// <remote> is the user-configured rclone remote name (Options -> Cloud Saves -> Settings), "Dropbox" by default.
 	std::string CloudSync_GetRemotePath(uint64 titleId)
 	{
 		std::string gameName = CafeSystem::GetForegroundTitleName();
@@ -262,7 +264,11 @@ namespace save
 		if (gameName.empty())
 			gameName = "Unknown Game";
 
-		return fmt::format("Dropbox:Cemu Cloud Saves/{} ({:016x})", gameName, titleId);
+		std::string remoteName = GetConfig().cloud_sync_remote_name.GetValue();
+		if (remoteName.empty())
+			remoteName = "Dropbox";
+
+		return fmt::format("{}:Cemu Cloud Saves/{} ({:016x})", remoteName, gameName, titleId);
 	}
 
 #if BOOST_OS_WINDOWS

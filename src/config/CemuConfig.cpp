@@ -278,6 +278,10 @@ XMLConfigParser CemuConfig::Load(XMLConfigParser& parser)
 	framebuffer_fetch = debug.get("FramebufferFetch", true);
 #endif
 
+	// cloud saves
+	auto cloudSaves = parser.get("CloudSaves");
+	cloud_sync_remote_name = cloudSaves.get("RcloneRemoteName", "Dropbox");
+
 	// input
 	auto input = parser.get("Input");
 	auto dsuc = input.get("DSUC");
@@ -441,6 +445,10 @@ XMLConfigParser CemuConfig::Save(XMLConfigParser& parser)
 	debug.set("GPUCaptureDir", gpu_capture_dir);
 	debug.set("FramebufferFetch", framebuffer_fetch);
 #endif
+
+	// cloud saves
+	auto cloudSaves = config.set("CloudSaves");
+	cloudSaves.set("RcloneRemoteName", cloud_sync_remote_name.GetValue().c_str());
 
 	// input
 	auto input = config.set("Input");

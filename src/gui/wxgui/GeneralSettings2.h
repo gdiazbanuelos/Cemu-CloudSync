@@ -110,7 +110,10 @@ private:
 #endif
 
 	// Cloud Saves
+	wxTextCtrl* m_cloud_remote_name;
 	wxTextCtrl* m_cloud_saves_status;
+
+	void OnCloudSavesCheckNow(wxCommandEvent& event);
 
 	void OnAccountCreate(wxCommandEvent& event);
 	void OnAccountDelete(wxCommandEvent& event);

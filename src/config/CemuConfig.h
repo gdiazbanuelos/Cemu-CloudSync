@@ -517,6 +517,9 @@ struct CemuConfig
 	ConfigValue<bool> framebuffer_fetch{ true };
 #endif
 
+	// cloud saves
+	ConfigValue<std::string> cloud_sync_remote_name{ "Dropbox" };
+
 	XMLConfigParser Load(XMLConfigParser& parser);
 	XMLConfigParser Save(XMLConfigParser& parser);
 

@@ -1082,19 +1082,38 @@ wxPanel* GeneralSettings2::AddCloudSavesPage(wxNotebook* notebook)
 	auto* panel = new wxPanel(notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
 	auto* sizer = new wxBoxSizer(wxVERTICAL);
 
-	sizer->Add(new wxStaticText(panel, wxID_ANY, _("Checks whether rclone is installed and the \"Dropbox\" remote is configured for CloudSync save syncing.")), 0, wxALL, 5);
+	{
+		auto* row = new wxFlexGridSizer(0, 3, 0, 0);
+		row->SetFlexibleDirection(wxBOTH);
+		row->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
-	m_cloud_saves_status = new wxTextCtrl(panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, 250), wxTE_MULTILINE | wxTE_READONLY | wxTE_DONTWRAP);
+		row->Add(new wxStaticText(panel, wxID_ANY, _("Rclone remote name")), 0, wxALIGN_CENTER_VERTICAL | wxALL, 5);
 
-	std::string message;
-	CloudSync::CheckDropboxRemote(message);
-	m_cloud_saves_status->SetValue(message);
+		m_cloud_remote_name = new wxTextCtrl(panel, wxID_ANY, wxEmptyString);
+		m_cloud_remote_name->SetMinSize(wxSize(150, -1));
+		m_cloud_remote_name->SetToolTip(_("The name of the rclone remote CloudSync uses to sync save files (as configured via \"rclone config\"). Doesn't have to be Dropbox - any rclone-supported cloud provider works."));
+		row->Add(m_cloud_remote_name, 0, wxALL | wxEXPAND, 5);
 
+		auto* check_button = new wxButton(panel, wxID_ANY, _("Check now"));
+		check_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnCloudSavesCheckNow, this);
+		row->Add(check_button, 0, wxALL, 5);
+
+		sizer->Add(row, 0, wxALL | wxEXPAND, 5);
+	}
+
+	m_cloud_saves_status = new wxTextCtrl(panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, 250), wxTE_MULTILINE | wxTE_READONLY);
 	sizer->Add(m_cloud_saves_status, 1, wxEXPAND | wxALL, 5);
 
 	panel->SetSizerAndFit(sizer);
 
 	return panel;
+}
+
+void GeneralSettings2::OnCloudSavesCheckNow(wxCommandEvent& event)
+{
+	std::string message;
+	CloudSync::CheckCloudRemote(m_cloud_remote_name->GetValue().utf8_string(), message);
+	m_cloud_saves_status->SetValue(message);
 }
 
 GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched, int initialTab)
@@ -1324,6 +1343,9 @@ void GeneralSettings2::StoreConfig()
 	config.gpu_capture_dir = m_gpu_capture_dir->GetValue().utf8_string();
 	config.framebuffer_fetch = m_framebuffer_fetch->IsChecked();
 #endif
+
+	// cloud saves
+	config.cloud_sync_remote_name = m_cloud_remote_name->GetValue().utf8_string();
 
 	GetConfigHandle().Save();
 }
@@ -2084,6 +2106,14 @@ void GeneralSettings2::ApplyConfig()
 	m_gpu_capture_dir->SetValue(wxString::FromUTF8(config.gpu_capture_dir.GetValue()));
 	m_framebuffer_fetch->SetValue(config.framebuffer_fetch);
 #endif
+
+	// cloud saves
+	m_cloud_remote_name->SetValue(wxString::FromUTF8(config.cloud_sync_remote_name.GetValue()));
+	{
+		std::string message;
+		CloudSync::CheckCloudRemote(m_cloud_remote_name->GetValue().utf8_string(), message);
+		m_cloud_saves_status->SetValue(message);
+	}
 }
 
 void GeneralSettings2::OnAudioAPISelected(wxCommandEvent& event)
