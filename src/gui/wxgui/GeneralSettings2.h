@@ -20,7 +20,9 @@ wxDECLARE_EVENT(wxEVT_ACCOUNTLIST_REFRESH, wxCommandEvent);
 class GeneralSettings2 : public wxDialog
 {
 public:
-	GeneralSettings2(wxWindow* parent, bool game_launched);
+	static constexpr int kCloudSavesTabIndex = 6;
+
+	GeneralSettings2(wxWindow* parent, bool game_launched, int initialTab = 0);
 	~GeneralSettings2();
 
 	[[nodiscard]] bool ShouldReloadGamelist() const  { return m_reload_gamelist; }
@@ -46,6 +48,7 @@ private:
 	wxPanel* AddOverlayPage(wxNotebook* notebook);
 	wxPanel* AddAccountPage(wxNotebook* notebook);
 	wxPanel* AddDebugPage(wxNotebook* notebook);
+	wxPanel* AddCloudSavesPage(wxNotebook* notebook);
 
 	// General
 	wxChoice * m_language;
@@ -105,6 +108,9 @@ private:
 	wxTextCtrl* m_gpu_capture_dir;
 	wxCheckBox* m_framebuffer_fetch;
 #endif
+
+	// Cloud Saves
+	wxTextCtrl* m_cloud_saves_status;
 
 	void OnAccountCreate(wxCommandEvent& event);
 	void OnAccountDelete(wxCommandEvent& event);

@@ -7,6 +7,7 @@
 #include "util/helpers/helpers.h"
 
 #include "Cafe/OS/libs/snd_core/ax.h"
+#include "Cemu/CloudSync/CloudSyncUtils.h"
 
 #include <wx/collpane.h>
 #include <wx/clrpicker.h>
@@ -1076,7 +1077,27 @@ wxPanel* GeneralSettings2::AddDebugPage(wxNotebook* notebook)
 	return panel;
 }
 
-GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched)
+wxPanel* GeneralSettings2::AddCloudSavesPage(wxNotebook* notebook)
+{
+	auto* panel = new wxPanel(notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+	auto* sizer = new wxBoxSizer(wxVERTICAL);
+
+	sizer->Add(new wxStaticText(panel, wxID_ANY, _("Checks whether rclone is installed and the \"Dropbox\" remote is configured for CloudSync save syncing.")), 0, wxALL, 5);
+
+	m_cloud_saves_status = new wxTextCtrl(panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, 250), wxTE_MULTILINE | wxTE_READONLY | wxTE_DONTWRAP);
+
+	std::string message;
+	CloudSync::CheckDropboxRemote(message);
+	m_cloud_saves_status->SetValue(message);
+
+	sizer->Add(m_cloud_saves_status, 1, wxEXPAND | wxALL, 5);
+
+	panel->SetSizerAndFit(sizer);
+
+	return panel;
+}
+
+GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched, int initialTab)
 	: wxDialog(parent, wxID_ANY, _("General settings"), wxDefaultPosition, wxDefaultSize, wxCLOSE_BOX | wxCLIP_CHILDREN | wxCAPTION | wxRESIZE_BORDER), m_game_launched(game_launched)
 {
 	SetIcon(wxICON(X_SETTINGS));
@@ -1090,6 +1111,8 @@ GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched)
 	notebook->AddPage(AddOverlayPage(notebook), _("Overlay"));
 	notebook->AddPage(AddAccountPage(notebook), _("Account"));
 	notebook->AddPage(AddDebugPage(notebook), _("Debug"));
+	notebook->AddPage(AddCloudSavesPage(notebook), _("Cloud Saves"));
+	notebook->SetSelection(initialTab);
 
 	Bind(wxEVT_CLOSE_WINDOW, &GeneralSettings2::OnClose, this);
 

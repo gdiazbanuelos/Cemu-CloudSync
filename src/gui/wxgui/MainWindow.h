@@ -80,7 +80,7 @@ public:
 #if BOOST_OS_WINDOWS
 	WXLRESULT MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam) override;
 #endif
-	void OpenSettings();
+	void OpenSettings(int initialTab = 0);
 
 	PadViewFrame* GetPadView() const { return m_padView; }
 
@@ -105,6 +105,7 @@ public:
 	void OnConsoleLanguage(wxCommandEvent& event);
 	void OnHelpAbout(wxCommandEvent& event);
 	void OnHelpUpdate(wxCommandEvent& event);
+	void OnCloudSavesMenu(wxCommandEvent& event);
 	void OnDebugSetting(wxCommandEvent& event);
 	void OnDebugLoggingToggleFlagGeneric(wxCommandEvent& event);
 	void OnPPCInfoToggle(wxCommandEvent& event);

@@ -154,6 +154,8 @@ enum
 	// help
 	MAINFRAME_MENU_ID_HELP_ABOUT = 21700,
 	MAINFRAME_MENU_ID_HELP_UPDATE,
+	// cloud saves
+	MAINFRAME_MENU_ID_CLOUD_SAVES = 21750,
 	// custom
 	MAINFRAME_ID_TIMER1 = 21800,
 };
@@ -235,6 +237,8 @@ EVT_MENU(MAINFRAME_MENU_ID_DEBUG_VIEW_TEXTURE_RELATIONS, MainWindow::OnDebugView
 // help menu
 EVT_MENU(MAINFRAME_MENU_ID_HELP_ABOUT, MainWindow::OnHelpAbout)
 EVT_MENU(MAINFRAME_MENU_ID_HELP_UPDATE, MainWindow::OnHelpUpdate)
+// cloud saves menu
+EVT_MENU(MAINFRAME_MENU_ID_CLOUD_SAVES, MainWindow::OnCloudSavesMenu)
 // misc
 EVT_COMMAND(wxID_ANY, wxEVT_REQUEST_GAMELIST_REFRESH, MainWindow::OnRequestGameListRefresh)
 
@@ -839,12 +843,12 @@ WXLRESULT MainWindow::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lPara
 }
 #endif
 
-void MainWindow::OpenSettings()
+void MainWindow::OpenSettings(int initialTab)
 {
 	auto& config = GetWxGUIConfig();
 	const auto language = config.language;
 
-	GeneralSettings2 frame(this, m_game_launched);
+	GeneralSettings2 frame(this, m_game_launched, initialTab);
 	frame.ShowModal();
 	const bool paths_modified = frame.ShouldReloadGamelist();
 	const bool mlc_modified = frame.MLCModified();
@@ -2131,6 +2135,11 @@ void MainWindow::OnHelpUpdate(wxCommandEvent& event)
 	test.ShowModal();
 }
 
+void MainWindow::OnCloudSavesMenu(wxCommandEvent& event)
+{
+	OpenSettings(GeneralSettings2::kCloudSavesTabIndex);
+}
+
 void MainWindow::RecreateMenu()
 {
 	if (m_menuBar)
@@ -2370,6 +2379,10 @@ void MainWindow::RecreateMenu()
 	// debugMenu->Append(MAINFRAME_MENU_ID_DEBUG_DUMP_FST, _("&Dump WUD filesystem"))->Enable(false);
 
 	m_menuBar->Append(debugMenu, _("&Debug"));
+	// cloud saves menu
+	wxMenu* cloudSavesMenu = new wxMenu();
+	cloudSavesMenu->Append(MAINFRAME_MENU_ID_CLOUD_SAVES, _("&Settings..."));
+	m_menuBar->Append(cloudSavesMenu, _("&Cloud Saves"));
 	// help menu
 	wxMenu* helpMenu = new wxMenu();
 	m_check_update_menu = helpMenu->Append(MAINFRAME_MENU_ID_HELP_UPDATE, _("&Check for updates"));

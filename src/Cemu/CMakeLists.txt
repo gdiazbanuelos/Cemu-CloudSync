@@ -1,4 +1,6 @@
 add_library(CemuComponents
+  CloudSync/CloudSyncUtils.cpp
+  CloudSync/CloudSyncUtils.h
   ExpressionParser/ExpressionParser.cpp
   ExpressionParser/ExpressionParser.h
   FileCache/FileCache.cpp
