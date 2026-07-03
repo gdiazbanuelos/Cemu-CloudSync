@@ -12,15 +12,14 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  check-changes:
+    name: Check for changes since last release
+    runs-on: ubuntu-latest
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    uses: ./.github/workflows/build.yml
-
-  release:
-    name: Create release
-    runs-on: ubuntu-22.04
-    needs: build
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      has_changes: ${{ steps.changelog.outputs.has_changes }}
+      version: ${{ steps.version.outputs.version }}
+      log: ${{ steps.changelog.outputs.log }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -41,7 +40,10 @@ jobs:
             LOG=$(git log --pretty=format:'- %s' --no-merges -n 30)
           fi
           if [ -z "$LOG" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
             LOG="- No code changes since last release"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
           {
             echo "log<<CHANGELOG_EOF"
@@ -49,6 +51,16 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> $GITHUB_OUTPUT
 
+  build:
+    needs: check-changes
+    if: needs.check-changes.outputs.has_changes == 'true'
+    uses: ./.github/workflows/build.yml
+
+  release:
+    name: Create release
+    runs-on: ubuntu-22.04
+    needs: [check-changes, build]
+    steps:
       - uses: actions/download-artifact@v8
         with:
           name: cemu-bin-linux-x64
@@ -68,7 +80,7 @@ jobs:
 
       - name: Package assets
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check-changes.outputs.version }}
         run: |
           sudo apt install -y zip
           mkdir upload
@@ -88,9 +100,9 @@ jobs:
 
       - name: Create or replace release
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check-changes.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           wget -q -O ghr.tar.gz https://github.com/tcnksm/ghr/releases/download/v0.15.0/ghr_v0.15.0_linux_amd64.tar.gz
           tar xzf ghr.tar.gz; rm ghr.tar.gz
-          ghr_v0.15.0_linux_amd64/ghr -replace -t "$GH_TOKEN" -n "Cemu $VERSION" -b "${{ steps.changelog.outputs.log }}" "v$VERSION" ./upload
+          ghr_v0.15.0_linux_amd64/ghr -replace -t "$GH_TOKEN" -n "Cemu $VERSION" -b "${{ needs.check-changes.outputs.log }}" "v$VERSION" ./upload
