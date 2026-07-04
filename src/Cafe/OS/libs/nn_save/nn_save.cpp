@@ -489,7 +489,10 @@ namespace save
 			uint32 high = GetTitleIdHigh(titleId) & (~0xC);
 			uint32 low = GetTitleIdLow(titleId);
 
-			CloudSync_PullSaveFromDropbox(high, low, titleId);
+			const bool cloudSyncEnabled = GetConfig().cloud_sync_enabled.GetValue();
+
+			if (cloudSyncEnabled)
+				CloudSync_PullSaveFromDropbox(high, low, titleId);
 
 			sint32 fscStatus = FSC_STATUS_FILE_NOT_FOUND;
 			char path[256];
@@ -502,7 +505,8 @@ namespace save
 
 			iosu::acp::CreateSaveMetaFiles(ActiveSettings::GetPersistentId(), titleId);
 
-			CloudSync_PushSaveToDropbox(high, low, titleId);
+			if (cloudSyncEnabled)
+				CloudSync_PushSaveToDropbox(high, low, titleId);
 		}
 
 		return SAVE_STATUS_OK;

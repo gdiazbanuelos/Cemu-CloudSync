@@ -110,10 +110,14 @@ private:
 #endif
 
 	// Cloud Saves
+	wxCheckBox* m_cloud_sync_enabled;
 	wxTextCtrl* m_cloud_remote_name;
+	wxButton* m_cloud_check_button;
 	wxTextCtrl* m_cloud_saves_status;
 
 	void OnCloudSavesCheckNow(wxCommandEvent& event);
+	void OnCloudSyncEnabledChanged(wxCommandEvent& event);
+	void UpdateCloudSavesControlsEnabled();
 
 	void OnAccountCreate(wxCommandEvent& event);
 	void OnAccountDelete(wxCommandEvent& event);

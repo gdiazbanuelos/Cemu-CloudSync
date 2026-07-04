@@ -280,6 +280,7 @@ XMLConfigParser CemuConfig::Load(XMLConfigParser& parser)
 
 	// cloud saves
 	auto cloudSaves = parser.get("CloudSaves");
+	cloud_sync_enabled = cloudSaves.get("Enabled", true);
 	cloud_sync_remote_name = cloudSaves.get("RcloneRemoteName", "Dropbox");
 
 	// input
@@ -448,6 +449,7 @@ XMLConfigParser CemuConfig::Save(XMLConfigParser& parser)
 
 	// cloud saves
 	auto cloudSaves = config.set("CloudSaves");
+	cloudSaves.set<bool>("Enabled", cloud_sync_enabled);
 	cloudSaves.set("RcloneRemoteName", cloud_sync_remote_name.GetValue().c_str());
 
 	// input

@@ -1082,6 +1082,11 @@ wxPanel* GeneralSettings2::AddCloudSavesPage(wxNotebook* notebook)
 	auto* panel = new wxPanel(notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
 	auto* sizer = new wxBoxSizer(wxVERTICAL);
 
+	m_cloud_sync_enabled = new wxCheckBox(panel, wxID_ANY, _("Enable cloud save syncing"));
+	m_cloud_sync_enabled->SetToolTip(_("When enabled, saves are pulled from the configured rclone remote when a game starts and pushed back up afterwards."));
+	m_cloud_sync_enabled->Bind(wxEVT_CHECKBOX, &GeneralSettings2::OnCloudSyncEnabledChanged, this);
+	sizer->Add(m_cloud_sync_enabled, 0, wxALL, 5);
+
 	{
 		auto* row = new wxFlexGridSizer(0, 3, 0, 0);
 		row->SetFlexibleDirection(wxBOTH);
@@ -1094,9 +1099,9 @@ wxPanel* GeneralSettings2::AddCloudSavesPage(wxNotebook* notebook)
 		m_cloud_remote_name->SetToolTip(_("The name of the rclone remote CloudSync uses to sync save files (as configured via \"rclone config\"). Doesn't have to be Dropbox - any rclone-supported cloud provider works."));
 		row->Add(m_cloud_remote_name, 0, wxALL | wxEXPAND, 5);
 
-		auto* check_button = new wxButton(panel, wxID_ANY, _("Check now"));
-		check_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnCloudSavesCheckNow, this);
-		row->Add(check_button, 0, wxALL, 5);
+		m_cloud_check_button = new wxButton(panel, wxID_ANY, _("Check now"));
+		m_cloud_check_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnCloudSavesCheckNow, this);
+		row->Add(m_cloud_check_button, 0, wxALL, 5);
 
 		sizer->Add(row, 0, wxALL | wxEXPAND, 5);
 	}
@@ -1114,6 +1119,19 @@ void GeneralSettings2::OnCloudSavesCheckNow(wxCommandEvent& event)
 	std::string message;
 	CloudSync::CheckCloudRemote(m_cloud_remote_name->GetValue().utf8_string(), message);
 	m_cloud_saves_status->SetValue(message);
+}
+
+void GeneralSettings2::OnCloudSyncEnabledChanged(wxCommandEvent& event)
+{
+	UpdateCloudSavesControlsEnabled();
+}
+
+void GeneralSettings2::UpdateCloudSavesControlsEnabled()
+{
+	const bool enabled = m_cloud_sync_enabled->IsChecked();
+	m_cloud_remote_name->Enable(enabled);
+	m_cloud_check_button->Enable(enabled);
+	m_cloud_saves_status->Enable(enabled);
 }
 
 GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched, int initialTab)
@@ -1345,6 +1363,7 @@ void GeneralSettings2::StoreConfig()
 #endif
 
 	// cloud saves
+	config.cloud_sync_enabled = m_cloud_sync_enabled->IsChecked();
 	config.cloud_sync_remote_name = m_cloud_remote_name->GetValue().utf8_string();
 
 	GetConfigHandle().Save();
@@ -2108,7 +2127,9 @@ void GeneralSettings2::ApplyConfig()
 #endif
 
 	// cloud saves
+	m_cloud_sync_enabled->SetValue(config.cloud_sync_enabled.GetValue());
 	m_cloud_remote_name->SetValue(wxString::FromUTF8(config.cloud_sync_remote_name.GetValue()));
+	UpdateCloudSavesControlsEnabled();
 	{
 		std::string message;
 		CloudSync::CheckCloudRemote(m_cloud_remote_name->GetValue().utf8_string(), message);

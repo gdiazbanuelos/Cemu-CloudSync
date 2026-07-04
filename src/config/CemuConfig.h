@@ -518,6 +518,7 @@ struct CemuConfig
 #endif
 
 	// cloud saves
+	ConfigValue<bool> cloud_sync_enabled{ true };
 	ConfigValue<std::string> cloud_sync_remote_name{ "Dropbox" };
 
 	XMLConfigParser Load(XMLConfigParser& parser);
