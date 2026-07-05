@@ -404,29 +404,31 @@ namespace save
 #if BOOST_OS_WINDOWS
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
+		std::string remoteName = remotePath.substr(0, remotePath.find(':'));
 
 		std::wstring cmdLine = L"rclone copy \"" + boost::nowide::widen(localPath) + L"\" \"" + boost::nowide::widen(remotePath) + L"\" --no-traverse -v";
 		cmdLine.push_back(L'\0'); // CreateProcessW requires a writable, mutable buffer
 
-		std::thread([cmdLine = std::move(cmdLine)]() mutable {
+		std::thread([cmdLine = std::move(cmdLine), remoteName]() mutable {
 			sint32 exitCode = CloudSync_RunRcloneBlocking(std::move(cmdLine));
 			cemuLog_log(LogType::Save, "CloudSync: rclone push finished with exit code {}", exitCode);
 			if (exitCode == 0)
-				LatteOverlay_pushNotification("Save pushed to Dropbox", 3000);
+				LatteOverlay_pushNotification(fmt::format("Save pushed to {}", remoteName), 3000);
 			else
-				LatteOverlay_pushNotification("CloudSync: push to Dropbox failed", 5000);
+				LatteOverlay_pushNotification(fmt::format("CloudSync: push to {} failed", remoteName), 5000);
 		}).detach();
 #else
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
+		std::string remoteName = remotePath.substr(0, remotePath.find(':'));
 
-		std::thread([localPath, remotePath]() {
+		std::thread([localPath, remotePath, remoteName]() {
 			sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", localPath, remotePath, "--no-traverse", "-v"});
 			cemuLog_log(LogType::Save, "CloudSync: rclone push finished with exit code {}", exitCode);
 			if (exitCode == 0)
-				LatteOverlay_pushNotification("Save pushed to Dropbox", 3000);
+				LatteOverlay_pushNotification(fmt::format("Save pushed to {}", remoteName), 3000);
 			else
-				LatteOverlay_pushNotification("CloudSync: push to Dropbox failed", 5000);
+				LatteOverlay_pushNotification(fmt::format("CloudSync: push to {} failed", remoteName), 5000);
 		}).detach();
 #endif
 	}
@@ -438,6 +440,7 @@ namespace save
 #if BOOST_OS_WINDOWS
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
+		std::string remoteName = remotePath.substr(0, remotePath.find(':'));
 
 		cemuLog_log(LogType::Save, "CloudSync: pulling from {}", remotePath);
 
@@ -449,21 +452,22 @@ namespace save
 		sint32 exitCode = CloudSync_RunRcloneBlocking(std::move(cmdLine));
 		cemuLog_log(LogType::Save, "CloudSync: rclone pull finished with exit code {}", exitCode);
 		if (exitCode == 0)
-			LatteOverlay_pushNotification("Save pulled from Dropbox", 3000);
+			LatteOverlay_pushNotification(fmt::format("Save pulled from {}", remoteName), 3000);
 		else
-			LatteOverlay_pushNotification("CloudSync: pull from Dropbox failed", 5000);
+			LatteOverlay_pushNotification(fmt::format("CloudSync: pull from {} failed", remoteName), 5000);
 #else
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
+		std::string remoteName = remotePath.substr(0, remotePath.find(':'));
 
 		cemuLog_log(LogType::Save, "CloudSync: pulling from {}", remotePath);
 
 		sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", remotePath, localPath, "--update", "--no-traverse", "-v"});
 		cemuLog_log(LogType::Save, "CloudSync: rclone pull finished with exit code {}", exitCode);
 		if (exitCode == 0)
-			LatteOverlay_pushNotification("Save pulled from Dropbox", 3000);
+			LatteOverlay_pushNotification(fmt::format("Save pulled from {}", remoteName), 3000);
 		else
-			LatteOverlay_pushNotification("CloudSync: pull from Dropbox failed", 5000);
+			LatteOverlay_pushNotification(fmt::format("CloudSync: pull from {} failed", remoteName), 5000);
 #endif
 	}
 
