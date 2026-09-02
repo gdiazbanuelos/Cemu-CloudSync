@@ -1805,7 +1805,9 @@ void MainWindow::SetMenuVisible(bool state)
 	if (m_menu_visible == state)
 		return;
 
+#if !BOOST_OS_MACOS
 	SetMenuBar(state ? m_menuBar : nullptr);
+#endif
 	m_menu_visible = state;
 }
 
