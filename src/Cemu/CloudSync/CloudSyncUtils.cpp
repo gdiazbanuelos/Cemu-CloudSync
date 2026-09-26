@@ -107,8 +107,8 @@ namespace CloudSync
 	// AppImages may prepend their bundled lib dir to LD_LIBRARY_PATH; if that leaks into
 	// rclone's process it can load Cemu-bundled versions of shared libs (e.g. libssl/libcrypto)
 	// that don't match what rclone was linked/tested against, causing TLS/certificate failures
-	// when talking to Dropbox. Mirrors CloudSync_BuildCleanEnv() in nn_save.cpp.
-	static std::vector<std::string> BuildCleanEnv()
+	// when talking to Dropbox.
+	std::vector<std::string> BuildCleanEnv()
 	{
 		static const std::vector<std::string> blockedVars = {
 			"LD_LIBRARY_PATH", "LD_PRELOAD", "APPDIR", "APPIMAGE", "OWD", "ARGV0"

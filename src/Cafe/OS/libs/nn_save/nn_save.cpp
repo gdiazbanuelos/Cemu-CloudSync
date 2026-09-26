@@ -14,6 +14,7 @@
 #include "Cafe/CafeSystem.h"
 #include "Cafe/Filesystem/fsc.h"
 #include "Cafe/HW/Latte/Core/LatteOverlay.h"
+#include "Cemu/CloudSync/CloudSyncUtils.h"
 
 #if BOOST_OS_WINDOWS
 #include <Windows.h>
@@ -21,9 +22,7 @@
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <cstdlib>
 #include <vector>
-extern char** environ;
 #endif
 
 #define SAVE_STATUS_OK ((FSStatus)FS_RESULT::SUCCESS)
@@ -295,76 +294,11 @@ namespace save
 		return (sint32)exitCode;
 	}
 #else
-	// AppImages mount their payload as a squashfs and typically don't expose the host's real
-	// $PATH to child processes the way a normally installed binary would, so a plain execvp("rclone", ...)
-	// often fails to find a system-installed rclone. We instead probe a fixed list of common install
-	// locations directly. /proc/1/root re-anchors the lookup at PID 1's root filesystem, which lets us
-	// reach the real host filesystem even if we're running inside a mount namespace/sandbox that
-	// otherwise hides it (e.g. some AppImage integrations, Steam Deck's read-only rootfs).
-	std::string CloudSync_FindRclonePath()
-	{
-		std::vector<std::string> candidates = {
-			"/usr/bin/rclone",
-			"/usr/local/bin/rclone",
-			"/var/lib/flatpak/exports/bin/rclone",
-		};
-		if (const char* home = getenv("HOME"))
-		{
-			candidates.emplace_back(std::string(home) + "/bin/rclone");
-			candidates.emplace_back(std::string(home) + "/.local/bin/rclone");
-		}
-
-		const std::vector<std::string> baseCandidates = candidates;
-		for (const std::string& path : baseCandidates)
-			candidates.push_back("/proc/1/root" + path);
-
-		for (const std::string& path : candidates)
-		{
-			if (access(path.c_str(), X_OK) == 0)
-				return path;
-		}
-		return {};
-	}
-
-	// Builds a copy of the current environment with AppImage-specific variables stripped.
-	// Cemu's AppImage sets APPDIR/APPIMAGE/OWD and may prepend its bundled lib dir to
-	// LD_LIBRARY_PATH; if that leaks into rclone's process it can load Cemu-bundled versions of
-	// shared libs (e.g. libssl/libcrypto) that don't match what rclone was linked/tested against,
-	// causing obscure TLS/certificate failures. Stripping them lets rclone resolve its own
-	// dependencies from the host system as if launched outside the AppImage.
-	std::vector<std::string> CloudSync_BuildCleanEnv()
-	{
-		static const std::vector<std::string> blockedVars = {
-			"LD_LIBRARY_PATH", "LD_PRELOAD", "APPDIR", "APPIMAGE", "OWD", "ARGV0"
-		};
-
-		std::vector<std::string> env;
-		for (char** envp = environ; *envp != nullptr; ++envp)
-		{
-			std::string entry(*envp);
-			const size_t eq = entry.find('=');
-			const std::string key = (eq == std::string::npos) ? entry : entry.substr(0, eq);
-
-			bool blocked = false;
-			for (const std::string& blockedVar : blockedVars)
-			{
-				if (key == blockedVar)
-				{
-					blocked = true;
-					break;
-				}
-			}
-			if (!blocked)
-				env.push_back(std::move(entry));
-		}
-		return env;
-	}
-
 	// Runs rclone via posix_spawn and blocks the calling thread until it finishes.
 	// Returns the process exit code, or -1 if rclone couldn't be found/launched.
 	sint32 CloudSync_RunRcloneBlocking(const std::vector<std::string>& args)
 	{
-		const std::string rclonePath = CloudSync_FindRclonePath();
+		const std::string rclonePath = CloudSync::FindRclonePath();
 		if (rclonePath.empty())
 		{
 			cemuLog_log(LogType::Save, "CloudSync: could not find an rclone executable");
@@ -377,7 +311,7 @@ namespace save
 			argv.push_back(const_cast<char*>(arg.c_str()));
 		argv.push_back(nullptr);
 
-		std::vector<std::string> envStorage = CloudSync_BuildCleanEnv();
+		std::vector<std::string> envStorage = CloudSync::BuildCleanEnv();
 		std::vector<char*> envp;
 		for (const std::string& entry : envStorage)
 			envp.push_back(const_cast<char*>(entry.c_str()));
@@ -398,6 +332,17 @@ namespace save
 	}
 #endif
 
+	// Logs the rclone result and shows the matching overlay notification. action/pastTense/preposition
+	// are e.g. ("push", "pushed", "to") or ("pull", "pulled", "from").
+	void CloudSync_NotifyRcloneResult(const char* action, const char* pastTense, const char* preposition, const std::string& remoteName, sint32 exitCode)
+	{
+		cemuLog_log(LogType::Save, "CloudSync: rclone {} finished with exit code {}", action, exitCode);
+		if (exitCode == 0)
+			LatteOverlay_pushNotification(fmt::format("Save {} {} {}", pastTense, preposition, remoteName), 3000);
+		else
+			LatteOverlay_pushNotification(fmt::format("CloudSync: {} {} {} failed", action, preposition, remoteName), 5000);
+	}
+
 	// Pushes the local save directory for the current title to Dropbox. Fire-and-forget on a background thread.
 	void CloudSync_PushSaveToDropbox(uint32 high, uint32 low, uint64 titleId)
 	{
@@ -411,11 +356,7 @@ namespace save
 
 		std::thread([cmdLine = std::move(cmdLine), remoteName]() mutable {
 			sint32 exitCode = CloudSync_RunRcloneBlocking(std::move(cmdLine));
-			cemuLog_log(LogType::Save, "CloudSync: rclone push finished with exit code {}", exitCode);
-			if (exitCode == 0)
-				LatteOverlay_pushNotification(fmt::format("Save pushed to {}", remoteName), 3000);
-			else
-				LatteOverlay_pushNotification(fmt::format("CloudSync: push to {} failed", remoteName), 5000);
+			CloudSync_NotifyRcloneResult("push", "pushed", "to", remoteName, exitCode);
 		}).detach();
 #else
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
@@ -424,11 +365,7 @@ namespace save
 
 		std::thread([localPath, remotePath, remoteName]() {
 			sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", localPath, remotePath, "--no-traverse", "-v"});
-			cemuLog_log(LogType::Save, "CloudSync: rclone push finished with exit code {}", exitCode);
-			if (exitCode == 0)
-				LatteOverlay_pushNotification(fmt::format("Save pushed to {}", remoteName), 3000);
-			else
-				LatteOverlay_pushNotification(fmt::format("CloudSync: push to {} failed", remoteName), 5000);
+			CloudSync_NotifyRcloneResult("push", "pushed", "to", remoteName, exitCode);
 		}).detach();
 #endif
 	}
@@ -450,11 +387,7 @@ namespace save
 		cmdLine.push_back(L'\0'); // CreateProcessW requires a writable, mutable buffer
 
 		sint32 exitCode = CloudSync_RunRcloneBlocking(std::move(cmdLine));
-		cemuLog_log(LogType::Save, "CloudSync: rclone pull finished with exit code {}", exitCode);
-		if (exitCode == 0)
-			LatteOverlay_pushNotification(fmt::format("Save pulled from {}", remoteName), 3000);
-		else
-			LatteOverlay_pushNotification(fmt::format("CloudSync: pull from {} failed", remoteName), 5000);
+		CloudSync_NotifyRcloneResult("pull", "pulled", "from", remoteName, exitCode);
 #else
 		std::string localPath = _pathToUtf8(CloudSync_GetLocalSaveDir(high, low));
 		std::string remotePath = CloudSync_GetRemotePath(titleId);
@@ -463,11 +396,7 @@ namespace save
 		cemuLog_log(LogType::Save, "CloudSync: pulling from {}", remotePath);
 
 		sint32 exitCode = CloudSync_RunRcloneBlocking({"copy", remotePath, localPath, "--update", "--no-traverse", "-v"});
-		cemuLog_log(LogType::Save, "CloudSync: rclone pull finished with exit code {}", exitCode);
-		if (exitCode == 0)
-			LatteOverlay_pushNotification(fmt::format("Save pulled from {}", remoteName), 3000);
-		else
-			LatteOverlay_pushNotification(fmt::format("CloudSync: pull from {} failed", remoteName), 5000);
+		CloudSync_NotifyRcloneResult("pull", "pulled", "from", remoteName, exitCode);
 #endif
 	}
 
