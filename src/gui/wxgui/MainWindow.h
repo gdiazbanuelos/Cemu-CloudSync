@@ -161,6 +161,7 @@ private:
 	void CafeRecreateCanvas() override;
 	void CafePPCProcessExit() override;
 
+	void OnRequestRestart(wxCommandEvent& event);
 	void OnRequestRecreateCanvas(wxCommandEvent& event);
 	void OnRequestGameExit(wxCommandEvent& event);
 
